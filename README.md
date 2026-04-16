@@ -99,7 +99,7 @@ pnpm --filter @base2/mobile-pwa dev
 Single-schema PostgreSQL con aislamiento por `empresa_id` en todas las tablas.
 El `empresa_id` se extrae del JWT en cada request y se inyecta en los queries via el interceptor/guard.
 
-## Endpoints principales (MVP Fase 2)
+## Endpoints principales
 
 | Metodo | Ruta | Descripcion |
 |---|---|---|
@@ -114,18 +114,26 @@ El `empresa_id` se extrae del JWT en cada request y se inyecta en los queries vi
 | PATCH | `/api/v1/puntos-control/:id/desinstalar` | Desinstalar punto |
 | GET/POST | `/api/v1/ordenes-trabajo` | Listar/crear OTs |
 | GET | `/api/v1/ordenes-trabajo/mi-dia?fecha=` | OTs del tecnico logueado |
+| GET | `/api/v1/ordenes-trabajo/:id/puntos-control` | Puntos de control de la OT (con revision actual) |
 | PATCH | `/api/v1/ordenes-trabajo/:id/asignar` | Asignar tecnicos |
 | PATCH | `/api/v1/ordenes-trabajo/:id/iniciar` | Iniciar OT |
 | PATCH | `/api/v1/ordenes-trabajo/:id/cerrar` | Cerrar OT con firma |
+| POST | `/api/v1/revisiones/iniciar` | Crea o recupera la revision de un PC |
+| GET | `/api/v1/revisiones/:id` | Detalle (respuestas + productos + fotos) |
+| PATCH | `/api/v1/revisiones/:id/finalizar` | Cierre de revision con checklist + productos |
+| POST/DELETE | `/api/v1/revisiones/:id/fotos` | Foto de revision (referencia por URL) |
+| GET | `/api/v1/preguntas-revision?tipoPuntoControlId=` | Checklist dinamico por tipo de PC |
+| GET | `/api/v1/productos/catalogo` | Catalogo de biocidas activos |
+| POST | `/api/v1/storage/presign` | URL prefirmada para subir un archivo a MinIO |
+| POST | `/api/v1/storage/firma` | Sube una firma (dataURL base64) y devuelve la URL |
 
-## Proximos pasos (Fase 3)
+## Proximos pasos (Fase 3 — pendientes)
 
+- [x] Flujo completo de revision en PWA (checklist dinamico, productos, foto, firma) — **Fase 3A**
+- [ ] Generacion de PDF del parte de trabajo y certificado — Fase 3B
+- [ ] Gestion completa de plano + puntos de control (drag & drop) — Fase 3C
+- [ ] Sincronizacion offline (IndexedDB + queue de mutations) — Fase 3D
 - [ ] RLS PostgreSQL + guard que inyecta `empresa_id` automaticamente
-- [ ] Gestion completa de plano + puntos de control (drag & drop)
-- [ ] Flujo completo de revision en PWA (checklist, productos, firma)
-- [ ] Generacion de PDF del parte de trabajo y certificado
-- [ ] Sincronizacion offline (IndexedDB + queue)
-- [ ] Captura de foto + geolocalizacion en revisiones
 - [ ] Modulo de presupuestos y contratos
 - [ ] Integracion AFIP (factura electronica)
 

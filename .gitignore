@@ -44,3 +44,5 @@ pnpm-debug.log*
 
 # Docker
 docker-compose.override.yml
+# TS incremental build info
+*.tsbuildinfo

@@ -52,16 +52,21 @@ async function main() {
   });
 
   const passwordHash = await bcrypt.hash('admin123', 10);
-  const empleadoAdmin = await prisma.empleado.create({
-    data: {
-      empresaId: empresa.id,
-      nombre: 'Admin',
-      apellidos: 'Demo',
-      email: 'admin@ddddemo.ar',
-      esTecnico: false,
-      activo: true,
-    },
+  let empleadoAdmin = await prisma.empleado.findFirst({
+    where: { empresaId: empresa.id, email: 'admin@ddddemo.ar' },
   });
+  if (!empleadoAdmin) {
+    empleadoAdmin = await prisma.empleado.create({
+      data: {
+        empresaId: empresa.id,
+        nombre: 'Admin',
+        apellidos: 'Demo',
+        email: 'admin@ddddemo.ar',
+        esTecnico: false,
+        activo: true,
+      },
+    });
+  }
 
   await prisma.usuario.upsert({
     where: { empresaId_username: { empresaId: empresa.id, username: 'admin' } },
@@ -76,22 +81,29 @@ async function main() {
     },
   });
 
-  const empleadoTec = await prisma.empleado.create({
-    data: {
-      empresaId: empresa.id,
-      nombre: 'Juan',
-      apellidos: 'Tecnico',
-      email: 'juan@ddddemo.ar',
-      esTecnico: true,
-      carnePlagasNumero: 'AR-00001',
-      carnePlagasTipo: 'aplicador',
-      carnePlagasVencimiento: new Date('2027-12-31'),
-      activo: true,
-    },
+  let empleadoTec = await prisma.empleado.findFirst({
+    where: { empresaId: empresa.id, email: 'juan@ddddemo.ar' },
   });
+  if (!empleadoTec) {
+    empleadoTec = await prisma.empleado.create({
+      data: {
+        empresaId: empresa.id,
+        nombre: 'Juan',
+        apellidos: 'Tecnico',
+        email: 'juan@ddddemo.ar',
+        esTecnico: true,
+        carnePlagasNumero: 'AR-00001',
+        carnePlagasTipo: 'aplicador',
+        carnePlagasVencimiento: new Date('2027-12-31'),
+        activo: true,
+      },
+    });
+  }
 
-  await prisma.usuario.create({
-    data: {
+  await prisma.usuario.upsert({
+    where: { empresaId_username: { empresaId: empresa.id, username: 'juan' } },
+    update: {},
+    create: {
       empresaId: empresa.id,
       empleadoId: empleadoTec.id,
       username: 'juan',
@@ -122,7 +134,7 @@ async function main() {
     },
   });
 
-  await prisma.tipoPuntoControl.upsert({
+  const tipoTrampa = await prisma.tipoPuntoControl.upsert({
     where: { empresaId_codigo: { empresaId: empresa.id, codigo: 'TRAMP-AD' } },
     update: {},
     create: {
@@ -136,7 +148,7 @@ async function main() {
     },
   });
 
-  await prisma.tipoPuntoControl.upsert({
+  const tipoUV = await prisma.tipoPuntoControl.upsert({
     where: { empresaId_codigo: { empresaId: empresa.id, codigo: 'LAMP-UV' } },
     update: {},
     create: {
@@ -150,18 +162,63 @@ async function main() {
     },
   });
 
-  // Producto biocida demo
-  await prisma.producto.upsert({
-    where: { empresaId_codigo: { empresaId: empresa.id, codigo: 'BIO-BRODI' } },
-    update: {},
-    create: {
-      empresaId: empresa.id,
-      lineaNegocioId: lineaDDD.id,
+  // Preguntas de revision (checklist dinamico) por tipo de PC
+  const preguntasCebadero = [
+    { codigo: 'CONSUMO', texto: 'Porcentaje de consumo del cebo', tipo: 'numerico', graf: true, orden: 1, ppal: true },
+    { codigo: 'ESTADO', texto: 'Estado del dispositivo', tipo: 'opcion_unica', orden: 2, opciones: ['bueno', 'regular', 'malo'] },
+    { codigo: 'REPUESTO', texto: 'Se repone el cebo?', tipo: 'boolean', orden: 3 },
+    { codigo: 'ACCESIBLE', texto: 'El punto es accesible?', tipo: 'boolean', orden: 4, valorPorDefecto: 'true' },
+    { codigo: 'INDICIOS', texto: 'Indicios de roedores (heces, mordidas, pelos)', tipo: 'opcion_multiple', orden: 5, opciones: ['heces', 'mordidas', 'pelos', 'ninguno'] },
+    { codigo: 'OBS', texto: 'Observaciones', tipo: 'texto', orden: 6 },
+  ];
+
+  const preguntasTrampa = [
+    { codigo: 'CAPTURA', texto: 'Cantidad de capturas', tipo: 'numerico', graf: true, orden: 1, ppal: true },
+    { codigo: 'ESPECIES', texto: 'Especies capturadas', tipo: 'opcion_multiple', orden: 2, opciones: ['moscas', 'cucarachas', 'mosquitos', 'polillas', 'otros'] },
+    { codigo: 'SUST', texto: 'Se sustituye el placa adhesiva?', tipo: 'boolean', orden: 3 },
+    { codigo: 'OBS', texto: 'Observaciones', tipo: 'texto', orden: 4 },
+  ];
+
+  const preguntasUV = [
+    { codigo: 'FUNC', texto: 'Lampara funcionando?', tipo: 'boolean', orden: 1, ppal: true },
+    { codigo: 'PLACA', texto: 'Se sustituye la placa adhesiva?', tipo: 'boolean', orden: 2 },
+    { codigo: 'TUBO', texto: 'Se sustituye el tubo UV?', tipo: 'boolean', orden: 3 },
+    { codigo: 'OBS', texto: 'Observaciones', tipo: 'texto', orden: 4 },
+  ];
+
+  const seedPreguntas = async (tipoPcId: string, preguntas: any[]) => {
+    for (const p of preguntas) {
+      await prisma.preguntaRevision.upsert({
+        where: { tipoPuntoControlId_codigo: { tipoPuntoControlId: tipoPcId, codigo: p.codigo } },
+        update: {},
+        create: {
+          empresaId: empresa.id,
+          tipoPuntoControlId: tipoPcId,
+          codigo: p.codigo,
+          textoPregunta: p.texto,
+          tipoRespuesta: p.tipo as any,
+          orden: p.orden,
+          esPrincipal: p.ppal ?? false,
+          esGraficable: p.graf ?? false,
+          respuestaMultiple: p.tipo === 'opcion_multiple',
+          valorPorDefecto: p.valorPorDefecto,
+          opciones: p.opciones ? (p.opciones as any) : undefined,
+        },
+      });
+    }
+  };
+
+  await seedPreguntas(tipoCebadero.id, preguntasCebadero);
+  await seedPreguntas(tipoTrampa.id, preguntasTrampa);
+  await seedPreguntas(tipoUV.id, preguntasUV);
+
+  // Catalogo de productos biocidas
+  const productosData = [
+    {
       codigo: 'BIO-BRODI',
       nombre: 'Brodifacoum 0.005%',
       nombreComercial: 'RataKill',
       fabricante: 'DemoChem',
-      esBiocida: true,
       registro: 'SENASA-AR-12345',
       materiaActiva: 'Brodifacoum',
       porcentajeMateriaActiva: 0.005,
@@ -169,7 +226,59 @@ async function main() {
       toxicidad: 'Categoria II',
       unidadMedida: 'kg',
     },
-  });
+    {
+      codigo: 'BIO-CIPER',
+      nombre: 'Cipermetrina 25%',
+      nombreComercial: 'InsecTec',
+      fabricante: 'DemoChem',
+      registro: 'SENASA-AR-67890',
+      materiaActiva: 'Cipermetrina',
+      porcentajeMateriaActiva: 25,
+      metodoAplicacion: 'Pulverizacion',
+      toxicidad: 'Categoria III',
+      unidadMedida: 'L',
+      dosificacion: '10 ml / L agua',
+    },
+    {
+      codigo: 'BIO-DELTA',
+      nombre: 'Deltametrina 2.5%',
+      nombreComercial: 'DeltaPro',
+      fabricante: 'DemoChem',
+      registro: 'SENASA-AR-54321',
+      materiaActiva: 'Deltametrina',
+      porcentajeMateriaActiva: 2.5,
+      metodoAplicacion: 'Pulverizacion / Termonebulizacion',
+      toxicidad: 'Categoria III',
+      unidadMedida: 'L',
+      dosificacion: '20 ml / L agua',
+    },
+    {
+      codigo: 'BIO-AMONIO',
+      nombre: 'Amonio cuaternario',
+      nombreComercial: 'Sanitizer-Q',
+      fabricante: 'DemoChem',
+      registro: 'ANMAT-AR-98765',
+      materiaActiva: 'Cloruro de benzalconio',
+      porcentajeMateriaActiva: 10,
+      metodoAplicacion: 'Pulverizacion / Mopa',
+      toxicidad: 'Categoria IV',
+      unidadMedida: 'L',
+      dosificacion: '50 ml / 10 L agua',
+    },
+  ];
+
+  for (const p of productosData) {
+    await prisma.producto.upsert({
+      where: { empresaId_codigo: { empresaId: empresa.id, codigo: p.codigo } },
+      update: {},
+      create: {
+        empresaId: empresa.id,
+        lineaNegocioId: lineaDDD.id,
+        esBiocida: true,
+        ...p,
+      },
+    });
+  }
 
   // Cliente y sede de prueba
   const cliente = await prisma.cliente.upsert({
@@ -190,7 +299,7 @@ async function main() {
     },
   });
 
-  await prisma.sede.upsert({
+  const sede = await prisma.sede.upsert({
     where: {
       empresaId_clienteId_numero: {
         empresaId: empresa.id,
@@ -215,10 +324,71 @@ async function main() {
     },
   });
 
-  console.log('Seed OK. Login:');
+  // Puntos de control de ejemplo en la sede
+  const puntosData = [
+    { codigo: 'CR-001', tipo: tipoCebadero.id, x: 120, y: 80, detalle: 'Deposito - pared norte' },
+    { codigo: 'CR-002', tipo: tipoCebadero.id, x: 250, y: 150, detalle: 'Cocina - detras de heladera' },
+    { codigo: 'CR-003', tipo: tipoCebadero.id, x: 410, y: 200, detalle: 'Patio trasero - esquina' },
+    { codigo: 'TA-001', tipo: tipoTrampa.id, x: 180, y: 120, detalle: 'Zona de preparacion' },
+    { codigo: 'TA-002', tipo: tipoTrampa.id, x: 350, y: 180, detalle: 'Sector basura' },
+    { codigo: 'UV-001', tipo: tipoUV.id, x: 220, y: 60, detalle: 'Entrada cocina' },
+  ];
+
+  for (const p of puntosData) {
+    await prisma.puntoControl.upsert({
+      where: {
+        empresaId_sedeId_codigo: { empresaId: empresa.id, sedeId: sede.id, codigo: p.codigo },
+      },
+      update: {},
+      create: {
+        empresaId: empresa.id,
+        sedeId: sede.id,
+        tipoPuntoControlId: p.tipo,
+        codigo: p.codigo,
+        x: p.x,
+        y: p.y,
+        detalleUbicacion: p.detalle,
+      },
+    });
+  }
+
+  // OT de prueba para hoy asignada al tecnico juan
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  let odt = await prisma.ordenTrabajo.findFirst({
+    where: { empresaId: empresa.id, numero: 'OT-0001' },
+  });
+  if (!odt) {
+    odt = await prisma.ordenTrabajo.create({
+      data: {
+        empresaId: empresa.id,
+        delegacionId: delegacion.id,
+        clienteId: cliente.id,
+        sedeId: sede.id,
+        lineaNegocioId: lineaDDD.id,
+        numero: 'OT-0001',
+        estado: 'asignada',
+        estadoAsignacion: 'asignada',
+        esDesratizacion: true,
+        esDesinsectacion: true,
+        fechaBloqueo: hoy,
+        horaInicioBloqueo: '09:00',
+        horaFinBloqueo: '11:00',
+      },
+    });
+
+    await prisma.ordenTrabajoEmpleado.create({
+      data: { odtId: odt.id, empleadoId: empleadoTec.id, esPrincipal: true },
+    });
+  }
+
+  console.log('Seed OK.');
+  console.log('Login:');
   console.log('  empresaCuit: 30-99999999-9');
   console.log('  username: admin / juan');
   console.log('  password: admin123');
+  console.log(`OT demo: ${odt.numero} (hoy, asignada a juan)`);
 }
 
 main()
