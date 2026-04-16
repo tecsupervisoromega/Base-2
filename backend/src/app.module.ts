@@ -10,6 +10,8 @@ import { PuntosControlModule } from './modules/puntos-control/puntos-control.mod
 import { OrdenesTrabajoModule } from './modules/ordenes-trabajo/ordenes-trabajo.module';
 import { RevisionesModule } from './modules/revisiones/revisiones.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { PartesModule } from './modules/partes/partes.module';
+import { PlanosModule } from './modules/planos/planos.module';
 
 @Module({
   imports: [
@@ -21,8 +23,10 @@ import { StorageModule } from './modules/storage/storage.module';
     ClientesModule,
     SedesModule,
     PuntosControlModule,
+    PlanosModule,
     OrdenesTrabajoModule,
     RevisionesModule,
+    PartesModule,
   ],
   controllers: [HealthController],
 })
