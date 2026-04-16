@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import OfflineBadge from '@/components/OfflineBadge';
 
 export const metadata: Metadata = {
   title: 'Base-2 Tecnico',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es-AR">
       <body>
+        <OfflineBadge />
         {children}
         <script
           dangerouslySetInnerHTML={{

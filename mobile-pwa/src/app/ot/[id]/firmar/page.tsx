@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { apiGet, apiPost, apiPatch } from '@/lib/api';
+import { apiPost } from '@/lib/api';
+import { getWithCache, mutateOrQueue } from '@/lib/sync';
 
 export default function FirmarOt({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -22,8 +23,8 @@ export default function FirmarOt({ params }: { params: { id: string } }) {
       router.push('/');
       return;
     }
-    // Chequeo de cantidad de PC pendientes antes de cerrar
-    apiGet<any[]>(`/api/v1/ordenes-trabajo/${params.id}/puntos-control`)
+    // Chequeo de cantidad de PC pendientes antes de cerrar (usa cache si no hay red)
+    getWithCache<any[]>(`/api/v1/ordenes-trabajo/${params.id}/puntos-control`)
       .then((ps) => setPuntosPendientes(ps.filter((p) => !p.revisionActual).length))
       .catch(() => setPuntosPendientes(null));
   }, [params.id, router]);
@@ -111,6 +112,11 @@ export default function FirmarOt({ params }: { params: { id: string } }) {
       setErr('Nombre del firmante requerido');
       return;
     }
+    const online = typeof navigator === 'undefined' ? true : navigator.onLine;
+    if (!online) {
+      setErr('Se necesita conexion para subir la firma. Conectate e intentalo de nuevo.');
+      return;
+    }
     setSaving(true);
     try {
       const dataUrl = canvasRef.current!.toDataURL('image/png');
@@ -119,7 +125,8 @@ export default function FirmarOt({ params }: { params: { id: string } }) {
         odtId: params.id,
       });
       const coords = await getPos();
-      await apiPatch(`/api/v1/ordenes-trabajo/${params.id}/cerrar`, {
+      // cerrar se puede encolar: si el servidor cae despues del upload, reintenta en background
+      await mutateOrQueue('PATCH', `/api/v1/ordenes-trabajo/${params.id}/cerrar`, {
         personaFirmante: nombre,
         dniFirmante: dni || undefined,
         firmaUrl,

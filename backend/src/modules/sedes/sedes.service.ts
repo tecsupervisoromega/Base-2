@@ -8,6 +8,7 @@ export class SedesService {
   list(empresaId: string, clienteId?: string) {
     return this.prisma.sede.findMany({
       where: { empresaId, ...(clienteId ? { clienteId } : {}) },
+      include: { cliente: { select: { id: true, razonSocial: true, numero: true } } },
       orderBy: { nombre: 'asc' },
       take: 200,
     });

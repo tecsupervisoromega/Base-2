@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { apiGet, apiPatch } from '@/lib/api';
+import { downloadAuth } from '@/lib/api';
+import { getWithCache, mutateOrQueue } from '@/lib/sync';
 
 type PuntoControl = {
   id: string;
@@ -42,8 +43,8 @@ export default function OrdenTrabajoDetalle({ params }: { params: { id: string }
       return;
     }
     Promise.all([
-      apiGet<Odt>(`/api/v1/ordenes-trabajo/${params.id}`),
-      apiGet<PuntoControl[]>(`/api/v1/ordenes-trabajo/${params.id}/puntos-control`),
+      getWithCache<Odt>(`/api/v1/ordenes-trabajo/${params.id}`),
+      getWithCache<PuntoControl[]>(`/api/v1/ordenes-trabajo/${params.id}/puntos-control`),
     ])
       .then(([o, p]) => {
         setOdt(o);
@@ -56,8 +57,9 @@ export default function OrdenTrabajoDetalle({ params }: { params: { id: string }
   async function iniciarOt() {
     if (!odt) return;
     try {
-      const updated = await apiPatch<Odt>(`/api/v1/ordenes-trabajo/${odt.id}/iniciar`, {});
-      setOdt(updated);
+      const r = await mutateOrQueue('PATCH', `/api/v1/ordenes-trabajo/${odt.id}/iniciar`, {});
+      if (r.response) setOdt(r.response as Odt);
+      else setOdt({ ...odt, estado: 'en_curso' });
     } catch (e: any) {
       setErr(e.message);
     }
@@ -188,6 +190,17 @@ export default function OrdenTrabajoDetalle({ params }: { params: { id: string }
           >
             Firmar y cerrar OT ({realizadas}/{total})
           </Link>
+        )}
+
+        {odt.estado === 'finalizada' && (
+          <button
+            onClick={() =>
+              downloadAuth(`/api/v1/ordenes-trabajo/${odt.id}/parte.pdf`, `parte-${odt.numero}.pdf`).catch((e) => alert(e.message))
+            }
+            className="fixed bottom-4 left-4 right-4 bg-slate-700 text-white text-center rounded-lg py-3 font-semibold shadow-lg"
+          >
+            Descargar parte de trabajo (PDF)
+          </button>
         )}
       </div>
     </main>

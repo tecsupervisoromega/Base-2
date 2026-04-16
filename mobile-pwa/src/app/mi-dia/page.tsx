@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getWithCache } from '@/lib/sync';
 
 type Odt = {
   id: string;
@@ -27,14 +28,10 @@ export default function MiDia() {
       router.push('/');
       return;
     }
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/ordenes-trabajo/mi-dia?fecha=${fecha}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        setOdts(Array.isArray(data) ? data : []);
-        setLoading(false);
-      });
+    getWithCache<Odt[]>(`/api/v1/ordenes-trabajo/mi-dia?fecha=${fecha}`)
+      .then((data) => setOdts(Array.isArray(data) ? data : []))
+      .catch(() => setOdts([]))
+      .finally(() => setLoading(false));
   }, [router, fecha]);
 
   function logout() {

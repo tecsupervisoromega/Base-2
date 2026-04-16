@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api';
+import { apiGet, apiPost, apiDelete } from '@/lib/api';
+import { mutateOrQueue } from '@/lib/sync';
 
 type Pregunta = {
   id: string;
@@ -203,7 +204,7 @@ export default function RevisionPunto({ params }: { params: { id: string; puntoI
           orden: idx,
         }));
 
-      await apiPatch(`/api/v1/revisiones/${revision.id}/finalizar`, {
+      await mutateOrQueue('PATCH', `/api/v1/revisiones/${revision.id}/finalizar`, {
         estadoConservacion: conservacion,
         hayIncidencia: incidencia,
         inaccesible,

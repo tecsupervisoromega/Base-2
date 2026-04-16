@@ -39,10 +39,12 @@ export default function DashboardPage() {
           <div className="w-8 h-8 bg-brand rounded text-white flex items-center justify-center font-bold">B2</div>
           <h1 className="font-semibold">Backoffice DDD</h1>
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <nav className="flex items-center gap-4 text-sm">
+          <a href="/dashboard" className="text-slate-700 hover:text-brand">Clientes</a>
+          <a href="/sedes" className="text-slate-700 hover:text-brand">Sedes / Planos</a>
           <span className="text-slate-500">{user?.username}</span>
           <button onClick={logout} className="text-red-600">Cerrar sesion</button>
-        </div>
+        </nav>
       </header>
 
       <div className="p-6 max-w-6xl mx-auto">
