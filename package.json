@@ -1,0 +1,26 @@
+{
+  "name": "base2-ddd",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Plataforma SaaS de gestion para empresas de control de plagas (DDD) - Argentina",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @base2/db prisma:generate",
+    "db:migrate": "pnpm --filter @base2/db prisma:migrate",
+    "db:studio": "pnpm --filter @base2/db prisma:studio",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "infra:logs": "docker compose -f infra/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "prettier": "^3.3.3"
+  }
+}

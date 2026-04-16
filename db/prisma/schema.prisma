@@ -1,0 +1,1137 @@
+// =============================================================================
+// Base-2 DDD — schema Prisma
+// Plataforma SaaS de gestion para empresas de control de plagas (Argentina)
+// Ver docs/modelo-datos.md para el modelo conceptual completo
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [uuidOssp(map: "uuid-ossp"), pgcrypto, postgis, citext, pg_trgm]
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum TipoUsuario {
+  admin
+  comercial
+  tecnico
+  supervisor
+  cliente_portal
+}
+
+enum EstadoUsuario {
+  activo
+  inactivo
+  bloqueado
+}
+
+enum TipoCliente {
+  empresa
+  particular
+  gobierno
+}
+
+enum EstadoCliente {
+  activo
+  inactivo
+  potencial
+}
+
+enum EstadoSede {
+  activa
+  inactiva
+  bloqueada
+}
+
+enum EstadoOdt {
+  creada
+  asignada
+  en_curso
+  finalizada
+  validada
+  facturada
+  cancelada
+  aparcada
+}
+
+enum EstadoAsignacionOdt {
+  sin_asignar
+  asignada
+  en_ruta
+}
+
+enum EstadoOperacion {
+  pendiente
+  en_curso
+  finalizada
+  cancelada
+}
+
+enum EstadoRevision {
+  pendiente
+  realizada
+  inaccesible
+  no_revisado
+}
+
+enum EstadoConservacionPC {
+  bueno
+  regular
+  malo
+  sustituido
+  desinstalado
+}
+
+enum TipoRespuestaChecklist {
+  boolean
+  numerico
+  texto
+  opcion_unica
+  opcion_multiple
+  foto
+}
+
+enum TipoRiesgoZona {
+  bajo
+  medio
+  alto
+  critico
+}
+
+enum TipoPlano {
+  imagen
+  pdf
+  esquematico
+}
+
+enum EstadoContrato {
+  borrador
+  activo
+  suspendido
+  finalizado
+  cancelado
+}
+
+enum EstadoIncidencia {
+  abierta
+  en_tratamiento
+  resuelta
+  descartada
+}
+
+enum PrioridadIncidencia {
+  baja
+  normal
+  alta
+  critica
+}
+
+enum TipoCarneArg {
+  aplicador
+  director_tecnico
+}
+
+enum TipoEventoAgenda {
+  orden_trabajo
+  reunion
+  formacion
+  vacaciones
+  ausencia
+  otro
+}
+
+enum TipoOdtFlag {
+  desinsectacion
+  desratizacion
+  desinfeccion
+  prevencion
+  asesoramiento
+  monitorizacion
+}
+
+enum EstadoFactura {
+  borrador
+  emitida
+  cobrada
+  anulada
+}
+
+enum TipoFacturaAR {
+  A
+  B
+  C
+  E
+  M
+  nota_credito
+  nota_debito
+  recibo
+}
+
+// -----------------------------------------------------------------------------
+// TENANCY & CONFIG
+// -----------------------------------------------------------------------------
+
+model Empresa {
+  id          String   @id @default(uuid()) @db.Uuid
+  nombre      String
+  razonSocial String?
+  cuit        String   @unique
+  email       String?
+  telefono    String?
+  web         String?
+  timezone    String   @default("America/Argentina/Buenos_Aires")
+  logoUrl     String?
+  activo      Boolean  @default(true)
+  config      Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  delegaciones      Delegacion[]
+  usuarios          Usuario[]
+  empleados         Empleado[]
+  clientes          Cliente[]
+  sedes             Sede[]
+  lineasNegocio     LineaNegocio[]
+  productos         Producto[]
+  plagas            Plaga[]
+  tiposPuntoControl TipoPuntoControl[]
+  tiposOperacion    TipoOperacion[]
+  contratos         Contrato[]
+  ordenesTrabajo    OrdenTrabajo[]
+  facturas          Factura[]
+  zonasComerciales  ZonaComercial[]
+
+  @@map("empresa")
+}
+
+model Delegacion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  empresaId           String   @db.Uuid
+  codigo              String
+  nombre              String
+  cuit                String?
+  direccion           String?
+  localidad           String?
+  provincia           String?
+  codigoPostal        String?
+  telefono            String?
+  email               String?
+  lat                 Float?
+  lng                 Float?
+  numRegistroBiocidas String?
+  zonaHoraria         String?
+  activo              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  empresa        Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleados      EmpleadoDelegacion[]
+  clientes       Cliente[]
+  ordenesTrabajo OrdenTrabajo[]
+
+  @@unique([empresaId, codigo])
+  @@index([empresaId])
+  @@map("delegacion")
+}
+
+model Usuario {
+  id             String        @id @default(uuid()) @db.Uuid
+  empresaId      String        @db.Uuid
+  empleadoId     String?       @unique @db.Uuid
+  clienteId      String?       @db.Uuid
+  username       String
+  email          String
+  passwordHash   String
+  tipo           TipoUsuario
+  estado         EstadoUsuario @default(activo)
+  usaOffline     Boolean       @default(false)
+  ultimaConexion DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  empresa  Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado Empleado?    @relation(fields: [empleadoId], references: [id])
+  cliente  Cliente?     @relation(fields: [clienteId], references: [id])
+  roles    UsuarioRol[]
+
+  @@unique([empresaId, username])
+  @@unique([empresaId, email])
+  @@index([empresaId])
+  @@map("usuario")
+}
+
+model Rol {
+  id        String @id @default(uuid()) @db.Uuid
+  empresaId String @db.Uuid
+  codigo    String
+  nombre    String
+  permisos  Json   @default("[]")
+
+  usuarios UsuarioRol[]
+
+  @@unique([empresaId, codigo])
+  @@map("rol")
+}
+
+model UsuarioRol {
+  usuarioId String @db.Uuid
+  rolId     String @db.Uuid
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rol     Rol     @relation(fields: [rolId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, rolId])
+  @@map("usuario_rol")
+}
+
+// -----------------------------------------------------------------------------
+// RRHH
+// -----------------------------------------------------------------------------
+
+model Empleado {
+  id                          String        @id @default(uuid()) @db.Uuid
+  empresaId                   String        @db.Uuid
+  nombre                      String
+  apellidos                   String?
+  dni                         String?
+  cuil                        String?
+  email                       String?
+  telefono                    String?
+  movil                       String?
+  direccion                   String?
+  localidad                   String?
+  provincia                   String?
+  fechaNacimiento             DateTime?     @db.Date
+  fechaIncorporacion          DateTime?     @db.Date
+  fechaSalida                 DateTime?     @db.Date
+  activo                      Boolean       @default(true)
+  esTecnico                   Boolean       @default(false)
+  esDirectorTecnico           Boolean       @default(false)
+  cargo                       String?
+  preciohora                  Decimal?      @db.Decimal(10, 2)
+  color                       String?
+  firmaUrl                    String?
+  fotoUrl                     String?
+  // Carnes SENASA / provincial (Argentina)
+  carnePlagasNumero           String?
+  carnePlagasTipo             TipoCarneArg?
+  carnePlagasExpedicion       DateTime?     @db.Date
+  carnePlagasVencimiento      DateTime?     @db.Date
+  // Permisos operativos
+  puedeMoverPuntosControl     Boolean       @default(false)
+  puedeModificarPuntosControl Boolean       @default(false)
+  puedeFirmarAntesFinalizar   Boolean       @default(false)
+  puedeAnadirServiciosOdt     Boolean       @default(false)
+  createdAt                   DateTime      @default(now())
+  updatedAt                   DateTime      @updatedAt
+
+  empresa        Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuario        Usuario?
+  delegaciones   EmpleadoDelegacion[]
+  lineasNegocio  EmpleadoLineaNegocio[]
+  ordenesTrabajo OrdenTrabajoEmpleado[]
+  revisiones     Revision[]
+  agenda         AgendaEvento[]
+  rutas          Ruta[]
+
+  @@index([empresaId])
+  @@map("empleado")
+}
+
+model EmpleadoDelegacion {
+  empleadoId   String @db.Uuid
+  delegacionId String @db.Uuid
+
+  empleado   Empleado   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  delegacion Delegacion @relation(fields: [delegacionId], references: [id], onDelete: Cascade)
+
+  @@id([empleadoId, delegacionId])
+  @@map("empleado_delegacion")
+}
+
+model EmpleadoLineaNegocio {
+  empleadoId     String @db.Uuid
+  lineaNegocioId String @db.Uuid
+
+  empleado     Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  lineaNegocio LineaNegocio @relation(fields: [lineaNegocioId], references: [id], onDelete: Cascade)
+
+  @@id([empleadoId, lineaNegocioId])
+  @@map("empleado_linea_negocio")
+}
+
+// -----------------------------------------------------------------------------
+// CRM
+// -----------------------------------------------------------------------------
+
+model ZonaComercial {
+  id        String  @id @default(uuid()) @db.Uuid
+  empresaId String  @db.Uuid
+  codigo    String
+  nombre    String
+  activo    Boolean @default(true)
+
+  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  clientes Cliente[]
+  sedes    Sede[]
+
+  @@unique([empresaId, codigo])
+  @@map("zona_comercial")
+}
+
+model Cliente {
+  id              String        @id @default(uuid()) @db.Uuid
+  empresaId       String        @db.Uuid
+  delegacionId    String?       @db.Uuid
+  zonaComercialId String?       @db.Uuid
+  gestorId        String?       @db.Uuid
+  numero          String
+  razonSocial     String
+  nombreFantasia  String?
+  tipo            TipoCliente   @default(empresa)
+  cuit            String?
+  dni             String?
+  email           String?
+  telefono        String?
+  movil           String?
+  direccion       String?
+  localidad       String?
+  provincia       String?
+  codigoPostal    String?
+  estado          EstadoCliente @default(activo)
+  observaciones   String?
+  riesgoEconomico Decimal?      @db.Decimal(14, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  empresa        Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  delegacion     Delegacion?    @relation(fields: [delegacionId], references: [id])
+  zonaComercial  ZonaComercial? @relation(fields: [zonaComercialId], references: [id])
+  sedes          Sede[]
+  contratos      Contrato[]
+  ordenesTrabajo OrdenTrabajo[]
+  facturas       Factura[]
+  usuariosPortal Usuario[]
+
+  @@unique([empresaId, numero])
+  @@index([empresaId])
+  @@index([empresaId, razonSocial])
+  @@map("cliente")
+}
+
+model Sede {
+  id                    String     @id @default(uuid()) @db.Uuid
+  empresaId             String     @db.Uuid
+  clienteId             String     @db.Uuid
+  zonaComercialId       String?    @db.Uuid
+  numero                String
+  codigo                String?
+  nombre                String
+  direccion             String
+  localidad             String?
+  provincia             String?
+  codigoPostal          String?
+  pais                  String?    @default("Argentina")
+  lat                   Float?
+  lng                   Float?
+  m2                    Decimal?   @db.Decimal(12, 2)
+  m3                    Decimal?   @db.Decimal(12, 2)
+  horarios              String?
+  personaContacto       String?
+  telefonoContacto      String?
+  emailContacto         String?
+  estado                EstadoSede @default(activa)
+  observaciones         String?
+  observacionesInternas String?
+  distanciaDelegacionKm Decimal?   @db.Decimal(8, 2)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  empresa        Empresa           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  cliente        Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  zonaComercial  ZonaComercial?    @relation(fields: [zonaComercialId], references: [id])
+  subsedes       Subsede[]
+  planos         PlanoSede[]
+  zonas          ZonaInstalacion[]
+  puntosControl  PuntoControl[]
+  ordenesTrabajo OrdenTrabajo[]
+  incidencias    Incidencia[]
+
+  @@unique([empresaId, clienteId, numero])
+  @@index([clienteId])
+  @@index([empresaId])
+  @@map("sede")
+}
+
+model Subsede {
+  id          String  @id @default(uuid()) @db.Uuid
+  empresaId   String  @db.Uuid
+  sedeId      String  @db.Uuid
+  codigo      String?
+  nombre      String
+  descripcion String?
+
+  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  @@map("subsede")
+}
+
+// -----------------------------------------------------------------------------
+// CATALOGO DDD
+// -----------------------------------------------------------------------------
+
+model LineaNegocio {
+  id                      String  @id @default(uuid()) @db.Uuid
+  empresaId               String  @db.Uuid
+  codigo                  String
+  nombre                  String
+  descripcion             String?
+  icono                   String?
+  color                   String?
+  requiereDirectorTecnico Boolean @default(false)
+  directorTecnicoId       String? @db.Uuid
+  generaParteTrabajo      Boolean @default(true)
+  activo                  Boolean @default(true)
+
+  empresa           Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleados         EmpleadoLineaNegocio[]
+  productos         Producto[]
+  tiposPuntoControl TipoPuntoControl[]
+  ordenesTrabajo    OrdenTrabajo[]
+  contratos         Contrato[]
+
+  @@unique([empresaId, codigo])
+  @@map("linea_negocio")
+}
+
+model Plaga {
+  id               String  @id @default(uuid()) @db.Uuid
+  empresaId        String  @db.Uuid
+  codigo           String
+  nombreComun      String
+  nombreCientifico String?
+  categoria        String?
+  icono            String?
+
+  empresa     Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  productos   ProductoPlaga[]
+  incidencias Incidencia[]
+
+  @@unique([empresaId, codigo])
+  @@map("plaga")
+}
+
+model Producto {
+  id                      String    @id @default(uuid()) @db.Uuid
+  empresaId               String    @db.Uuid
+  lineaNegocioId          String?   @db.Uuid
+  codigo                  String
+  nombre                  String
+  nombreComercial         String?
+  descripcion             String?
+  fabricante              String?
+  esBiocida               Boolean   @default(true)
+  esTangible              Boolean   @default(true)
+  obsoleto                Boolean   @default(false)
+  // Registro sanitario Argentina (ANMAT/SENASA)
+  registro                String?
+  registroExpedicion      DateTime? @db.Date
+  registroVencimiento     DateTime? @db.Date
+  materiaActiva           String?
+  porcentajeMateriaActiva Decimal?  @db.Decimal(6, 3)
+  metodoAplicacion        String?
+  dosificacion            String?
+  plazoSeguridadHoras     Int?
+  toxicidad               String?
+  unidadMedida            String?
+  precioCompra            Decimal?  @db.Decimal(12, 2)
+  precioVenta             Decimal?  @db.Decimal(12, 2)
+  fichaTecnicaUrl         String?
+  fichaSeguridadUrl       String?
+  registroSanitarioUrl    String?
+  imagenUrl               String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  empresa                Empresa                 @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  lineaNegocio           LineaNegocio?           @relation(fields: [lineaNegocioId], references: [id])
+  plagas                 ProductoPlaga[]
+  lineasProductoRevision LineaProductoRevision[]
+
+  @@unique([empresaId, codigo])
+  @@index([empresaId])
+  @@map("producto")
+}
+
+model ProductoPlaga {
+  productoId String @db.Uuid
+  plagaId    String @db.Uuid
+
+  producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  plaga    Plaga    @relation(fields: [plagaId], references: [id], onDelete: Cascade)
+
+  @@id([productoId, plagaId])
+  @@map("producto_plaga")
+}
+
+model TipoPuntoControl {
+  id                      String  @id @default(uuid()) @db.Uuid
+  empresaId               String  @db.Uuid
+  lineaNegocioId          String? @db.Uuid
+  codigo                  String
+  nombre                  String
+  descripcion             String?
+  icono                   String?
+  color                   String?
+  prefijoCodigo           String?
+  consumoDelCebo          Boolean @default(false)
+  seReponeElCebo          Boolean @default(false)
+  umbralCritico           Int?
+  umbralSeguridad         Int?
+  diasMaxCambioConsumible Int?
+  requiereUuid            Boolean @default(false)
+  tieneUmbralesPorEspecie Boolean @default(false)
+  orden                   Int     @default(0)
+
+  empresa       Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  lineaNegocio  LineaNegocio?      @relation(fields: [lineaNegocioId], references: [id])
+  preguntas     PreguntaRevision[]
+  puntosControl PuntoControl[]
+
+  @@unique([empresaId, codigo])
+  @@map("tipo_punto_control")
+}
+
+model TipoOperacion {
+  id              String  @id @default(uuid()) @db.Uuid
+  empresaId       String  @db.Uuid
+  codigo          String
+  nombre          String
+  grupo           String?
+  subgrupo        String?
+  duracionMinutos Int?
+  periodicidad    String?
+  instrucciones   String?
+
+  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  operaciones Operacion[]
+
+  @@unique([empresaId, codigo])
+  @@map("tipo_operacion")
+}
+
+// -----------------------------------------------------------------------------
+// PUNTOS DE CONTROL (geo sobre planos)
+// -----------------------------------------------------------------------------
+
+model PlanoSede {
+  id                    String    @id @default(uuid()) @db.Uuid
+  empresaId             String    @db.Uuid
+  sedeId                String    @db.Uuid
+  nombre                String
+  archivoUrl            String
+  tipo                  TipoPlano @default(imagen)
+  ancho                 Int?
+  alto                  Int?
+  orden                 Int       @default(0)
+  activo                Boolean   @default(true)
+  ultimaActualizacionPC DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  sede          Sede           @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  puntosControl PuntoControl[]
+
+  @@index([sedeId])
+  @@map("plano_sede")
+}
+
+model ZonaInstalacion {
+  id          String         @id @default(uuid()) @db.Uuid
+  empresaId   String         @db.Uuid
+  sedeId      String         @db.Uuid
+  codigo      String?
+  nombre      String
+  descripcion String?
+  tipoRiesgo  TipoRiesgoZona @default(medio)
+  // Poligono del area (en coords del plano o WGS84). Se maneja como string WKT
+  // y/o como columna geometry via migracion SQL manual.
+  poligonoWkt String?
+
+  sede          Sede           @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  puntosControl PuntoControl[]
+
+  @@index([sedeId])
+  @@map("zona_instalacion")
+}
+
+model PuntoControl {
+  id                          String    @id @default(uuid()) @db.Uuid
+  empresaId                   String    @db.Uuid
+  sedeId                      String    @db.Uuid
+  planoId                     String?   @db.Uuid
+  zonaInstalacionId           String?   @db.Uuid
+  tipoPuntoControlId          String    @db.Uuid
+  codigo                      String
+  identificadorUnico          String?
+  uuidQr                      String?   @unique
+  codigoBarras                String?
+  modelo                      String?
+  // Coordenadas sobre el plano (0..ancho, 0..alto)
+  x                           Float?
+  y                           Float?
+  // Coordenadas reales (si el punto es exterior y se geolocaliza)
+  lat                         Float?
+  lng                         Float?
+  orden                       Int       @default(0)
+  revisable                   Boolean   @default(true)
+  desinstalado                Boolean   @default(false)
+  motivoDesinstalacion        String?
+  tipoInstalacion             String?
+  observaciones               String?
+  observacionesPublicas       String?
+  umbralCritico               Int?
+  umbralSeguridad             Int?
+  diasCambioConsumible        Int?
+  fechaUltimoCambioConsumible DateTime?
+  detalleUbicacion            String?
+  subzona                     String?
+  fechaCreacion               DateTime  @default(now())
+  fechaActualizacion          DateTime  @updatedAt
+
+  sede           Sede                       @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  plano          PlanoSede?                 @relation(fields: [planoId], references: [id])
+  zona           ZonaInstalacion?           @relation(fields: [zonaInstalacionId], references: [id])
+  tipo           TipoPuntoControl           @relation(fields: [tipoPuntoControlId], references: [id])
+  revisiones     Revision[]
+  ordenesTrabajo OrdenTrabajoPuntoControl[]
+
+  @@unique([empresaId, sedeId, codigo])
+  @@index([sedeId])
+  @@index([planoId])
+  @@map("punto_control")
+}
+
+// -----------------------------------------------------------------------------
+// OPERACIONES (OT, revisiones, tratamientos)
+// -----------------------------------------------------------------------------
+
+model OrdenTrabajo {
+  id                     String              @id @default(uuid()) @db.Uuid
+  empresaId              String              @db.Uuid
+  delegacionId           String?             @db.Uuid
+  clienteId              String              @db.Uuid
+  sedeId                 String              @db.Uuid
+  contratoId             String?             @db.Uuid
+  lineaNegocioId         String              @db.Uuid
+  rutaId                 String?             @db.Uuid
+  numero                 String
+  estado                 EstadoOdt           @default(creada)
+  estadoAsignacion       EstadoAsignacionOdt @default(sin_asignar)
+  tipoOdt                String?
+  // Flags DDD (una OT puede combinar varias)
+  esDesinsectacion       Boolean             @default(false)
+  esDesratizacion        Boolean             @default(false)
+  esDesinfeccion         Boolean             @default(false)
+  esMonitorizacion       Boolean             @default(false)
+  esPrevencion           Boolean             @default(false)
+  esAsesoramiento        Boolean             @default(false)
+  // Programacion
+  fechaBloqueo           DateTime?           @db.Date
+  horaInicioBloqueo      String?
+  horaFinBloqueo         String?
+  // Ejecucion real
+  horaInicioReal         DateTime?
+  horaFinReal            DateTime?
+  duracionMin            Int?
+  // Cierre
+  notaInterna            String?
+  notaPublica            String?
+  personaFirmante        String?
+  dniFirmante            String?
+  firmaUrl               String?
+  latCierre              Float?
+  lngCierre              Float?
+  ipCierre               String?
+  horaCierre             DateTime?
+  cobrarEnMetalico       Boolean             @default(false)
+  importePagado          Decimal?            @db.Decimal(12, 2)
+  coste                  Decimal?            @db.Decimal(12, 2)
+  completadoPorId        String?             @db.Uuid
+  motivoCancelacion      String?
+  motivoAparcada         String?
+  numeroReprogramaciones Int                 @default(0)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  empresa              Empresa                    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  delegacion           Delegacion?                @relation(fields: [delegacionId], references: [id])
+  cliente              Cliente                    @relation(fields: [clienteId], references: [id])
+  sede                 Sede                       @relation(fields: [sedeId], references: [id])
+  contrato             Contrato?                  @relation(fields: [contratoId], references: [id])
+  lineaNegocio         LineaNegocio               @relation(fields: [lineaNegocioId], references: [id])
+  ruta                 Ruta?                      @relation(fields: [rutaId], references: [id])
+  empleados            OrdenTrabajoEmpleado[]
+  puntosControl        OrdenTrabajoPuntoControl[]
+  operaciones          Operacion[]
+  revisiones           Revision[]
+  tratamientos         LineaTratamientoOdt[]
+  incidenciasCreadas   Incidencia[]               @relation("IncidenciaCreaOrigen")
+  incidenciasResueltas Incidencia[]               @relation("IncidenciaResuelve")
+  diagnosis            Diagnosis?
+  agendaEventos        AgendaEvento[]
+  facturas             Factura[]
+
+  @@unique([empresaId, numero])
+  @@index([empresaId, estado])
+  @@index([clienteId])
+  @@index([sedeId])
+  @@index([fechaBloqueo])
+  @@map("orden_trabajo")
+}
+
+model OrdenTrabajoEmpleado {
+  odtId       String  @db.Uuid
+  empleadoId  String  @db.Uuid
+  esPrincipal Boolean @default(false)
+
+  odt      OrdenTrabajo @relation(fields: [odtId], references: [id], onDelete: Cascade)
+  empleado Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@id([odtId, empleadoId])
+  @@map("orden_trabajo_empleado")
+}
+
+model OrdenTrabajoPuntoControl {
+  odtId          String @db.Uuid
+  puntoControlId String @db.Uuid
+
+  odt          OrdenTrabajo @relation(fields: [odtId], references: [id], onDelete: Cascade)
+  puntoControl PuntoControl @relation(fields: [puntoControlId], references: [id], onDelete: Cascade)
+
+  @@id([odtId, puntoControlId])
+  @@map("orden_trabajo_punto_control")
+}
+
+model Operacion {
+  id                String          @id @default(uuid()) @db.Uuid
+  empresaId         String          @db.Uuid
+  odtId             String          @db.Uuid
+  tipoOperacionId   String          @db.Uuid
+  estado            EstadoOperacion @default(pendiente)
+  nombre            String?
+  duracionMin       Int?
+  instrucciones     String?
+  motivoCancelacion String?
+  orden             Int             @default(0)
+
+  odt           OrdenTrabajo  @relation(fields: [odtId], references: [id], onDelete: Cascade)
+  tipoOperacion TipoOperacion @relation(fields: [tipoOperacionId], references: [id])
+
+  @@index([odtId])
+  @@map("operacion")
+}
+
+model Revision {
+  id                     String                @id @default(uuid()) @db.Uuid
+  empresaId              String                @db.Uuid
+  odtId                  String                @db.Uuid
+  puntoControlId         String                @db.Uuid
+  empleadoId             String?               @db.Uuid
+  fecha                  DateTime              @default(now())
+  estado                 EstadoRevision        @default(pendiente)
+  estadoConservacion     EstadoConservacionPC?
+  hayIncidencia          Boolean               @default(false)
+  metodoRevision         String?
+  metodoLectura          String?
+  seCambiaElCebo         Boolean               @default(false)
+  seSustituyeDispositivo Boolean               @default(false)
+  inaccesible            Boolean               @default(false)
+  observaciones          String?
+  datoGrafico1           Decimal?              @db.Decimal(12, 3)
+  datoGrafico2           Decimal?              @db.Decimal(12, 3)
+  lat                    Float?
+  lng                    Float?
+
+  odt          OrdenTrabajo                @relation(fields: [odtId], references: [id], onDelete: Cascade)
+  puntoControl PuntoControl                @relation(fields: [puntoControlId], references: [id])
+  empleado     Empleado?                   @relation(fields: [empleadoId], references: [id])
+  respuestas   PreguntaRespuestaRevision[]
+  productos    LineaProductoRevision[]
+  fotos        FotoRevision[]
+
+  @@index([odtId])
+  @@index([puntoControlId])
+  @@map("revision")
+}
+
+model PreguntaRevision {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  empresaId           String                 @db.Uuid
+  tipoPuntoControlId  String                 @db.Uuid
+  codigo              String
+  textoPregunta       String
+  tipoRespuesta       TipoRespuestaChecklist
+  orden               Int                    @default(0)
+  esPrincipal         Boolean                @default(false)
+  esGraficable        Boolean                @default(false)
+  respuestaMultiple   Boolean                @default(false)
+  numeroMaxRespuestas Int?
+  valorPorDefecto     String?
+  opciones            Json?
+
+  tipoPuntoControl TipoPuntoControl            @relation(fields: [tipoPuntoControlId], references: [id], onDelete: Cascade)
+  respuestas       PreguntaRespuestaRevision[]
+
+  @@unique([tipoPuntoControlId, codigo])
+  @@map("pregunta_revision")
+}
+
+model PreguntaRespuestaRevision {
+  id             String  @id @default(uuid()) @db.Uuid
+  revisionId     String  @db.Uuid
+  preguntaId     String  @db.Uuid
+  codigoPregunta String
+  textoPregunta  String
+  respuesta      String?
+  orden          Int     @default(0)
+
+  revision Revision         @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  pregunta PreguntaRevision @relation(fields: [preguntaId], references: [id])
+
+  @@index([revisionId])
+  @@map("pregunta_respuesta_revision")
+}
+
+model LineaProductoRevision {
+  id              String    @id @default(uuid()) @db.Uuid
+  revisionId      String    @db.Uuid
+  productoId      String    @db.Uuid
+  cantidad        Decimal   @db.Decimal(12, 3)
+  unidadMedida    String?
+  lote            String?
+  fechaCaducidad  DateTime? @db.Date
+  dosificacion    String?
+  agenteACombatir String?
+
+  revision Revision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@index([revisionId])
+  @@map("linea_producto_revision")
+}
+
+model FotoRevision {
+  id          String   @id @default(uuid()) @db.Uuid
+  revisionId  String   @db.Uuid
+  url         String
+  descripcion String?
+  createdAt   DateTime @default(now())
+
+  revision Revision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@map("foto_revision")
+}
+
+model LineaTratamientoOdt {
+  id                    String    @id @default(uuid()) @db.Uuid
+  empresaId             String    @db.Uuid
+  odtId                 String    @db.Uuid
+  nombre                String
+  descripcion           String?
+  agenteACombatir       String?
+  indicacionesEjecucion String?
+  fechaProximoServicio  DateTime? @db.Date
+  orden                 Int       @default(0)
+
+  odt OrdenTrabajo @relation(fields: [odtId], references: [id], onDelete: Cascade)
+
+  @@index([odtId])
+  @@map("linea_tratamiento_odt")
+}
+
+model Incidencia {
+  id               String              @id @default(uuid()) @db.Uuid
+  empresaId        String              @db.Uuid
+  sedeId           String              @db.Uuid
+  odtOrigenId      String?             @db.Uuid
+  odtResuelveId    String?             @db.Uuid
+  plagaId          String?             @db.Uuid
+  categoria        String?
+  texto            String
+  medidaCorrectora String?
+  fecha            DateTime            @default(now())
+  fechaResolucion  DateTime?
+  estado           EstadoIncidencia    @default(abierta)
+  prioridad        PrioridadIncidencia @default(normal)
+  responsable      String?
+  areaAfectada     String?
+  agenteACombatir  String?
+
+  sede        Sede          @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  odtOrigen   OrdenTrabajo? @relation("IncidenciaCreaOrigen", fields: [odtOrigenId], references: [id])
+  odtResuelve OrdenTrabajo? @relation("IncidenciaResuelve", fields: [odtResuelveId], references: [id])
+  plaga       Plaga?        @relation(fields: [plagaId], references: [id])
+
+  @@index([sedeId])
+  @@index([estado])
+  @@map("incidencia")
+}
+
+model Diagnosis {
+  id                 String   @id @default(uuid()) @db.Uuid
+  odtId              String   @unique @db.Uuid
+  especieInvestigada String?
+  distribucion       String?
+  nivelRiesgo        String?
+  urgenciaActuacion  String?
+  factoresRiesgo     String?
+  medidasControl     String?
+  resumenPasos       String?
+  actividadRoedores  String?
+  cadaveresRoedores  Boolean?
+  especiesPresentes  String?
+
+  odt OrdenTrabajo @relation(fields: [odtId], references: [id], onDelete: Cascade)
+
+  @@map("diagnosis")
+}
+
+// -----------------------------------------------------------------------------
+// AGENDA & RUTAS
+// -----------------------------------------------------------------------------
+
+model AgendaEvento {
+  id          String           @id @default(uuid()) @db.Uuid
+  empresaId   String           @db.Uuid
+  empleadoId  String           @db.Uuid
+  odtId       String?          @db.Uuid
+  tipo        TipoEventoAgenda @default(orden_trabajo)
+  titulo      String
+  descripcion String?
+  fechaInicio DateTime
+  fechaFin    DateTime
+  todoElDia   Boolean          @default(false)
+  color       String?
+  lugar       String?
+  latInicio   Float?
+  lngInicio   Float?
+  latFin      Float?
+  lngFin      Float?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  empleado Empleado      @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  odt      OrdenTrabajo? @relation(fields: [odtId], references: [id], onDelete: SetNull)
+
+  @@index([empleadoId, fechaInicio])
+  @@map("agenda_evento")
+}
+
+model Ruta {
+  id         String   @id @default(uuid()) @db.Uuid
+  empresaId  String   @db.Uuid
+  empleadoId String   @db.Uuid
+  fecha      DateTime @db.Date
+  nombre     String?
+  optimizada Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  empleado       Empleado       @relation(fields: [empleadoId], references: [id])
+  ordenesTrabajo OrdenTrabajo[]
+
+  @@unique([empresaId, empleadoId, fecha])
+  @@map("ruta")
+}
+
+// -----------------------------------------------------------------------------
+// COMERCIAL / CONTRATOS / FACTURACION (base minima, Fase 2)
+// -----------------------------------------------------------------------------
+
+model Contrato {
+  id               String         @id @default(uuid()) @db.Uuid
+  empresaId        String         @db.Uuid
+  clienteId        String         @db.Uuid
+  lineaNegocioId   String         @db.Uuid
+  numero           String
+  fechaInicio      DateTime       @db.Date
+  fechaFin         DateTime?      @db.Date
+  estado           EstadoContrato @default(borrador)
+  formaCobro       String?
+  formaFacturacion String?
+  diasFacturacion  String?
+  diasPago         Int?
+  renovable        Boolean        @default(false)
+  observaciones    String?
+  importeTotal     Decimal?       @db.Decimal(14, 2)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  empresa        Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  cliente        Cliente        @relation(fields: [clienteId], references: [id])
+  lineaNegocio   LineaNegocio   @relation(fields: [lineaNegocioId], references: [id])
+  ordenesTrabajo OrdenTrabajo[]
+  facturas       Factura[]
+
+  @@unique([empresaId, numero])
+  @@index([clienteId])
+  @@map("contrato")
+}
+
+model Factura {
+  id               String        @id @default(uuid()) @db.Uuid
+  empresaId        String        @db.Uuid
+  clienteId        String        @db.Uuid
+  contratoId       String?       @db.Uuid
+  odtId            String?       @db.Uuid
+  numero           String
+  tipo             TipoFacturaAR @default(B)
+  puntoVenta       String?
+  cae              String?
+  caeVencimiento   DateTime?     @db.Date
+  fechaEmision     DateTime      @db.Date
+  fechaVencimiento DateTime?     @db.Date
+  baseImponible    Decimal       @default(0) @db.Decimal(14, 2)
+  iva              Decimal       @default(0) @db.Decimal(14, 2)
+  importeTotal     Decimal       @default(0) @db.Decimal(14, 2)
+  estado           EstadoFactura @default(borrador)
+  observaciones    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  empresa  Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  cliente  Cliente        @relation(fields: [clienteId], references: [id])
+  contrato Contrato?      @relation(fields: [contratoId], references: [id])
+  odt      OrdenTrabajo?  @relation(fields: [odtId], references: [id])
+  lineas   LineaFactura[]
+
+  @@unique([empresaId, numero])
+  @@index([clienteId])
+  @@map("factura")
+}
+
+model LineaFactura {
+  id             String  @id @default(uuid()) @db.Uuid
+  facturaId      String  @db.Uuid
+  descripcion    String
+  cantidad       Decimal @db.Decimal(12, 3)
+  precioUnitario Decimal @db.Decimal(14, 4)
+  porcentajeIva  Decimal @default(21) @db.Decimal(5, 2)
+  descuento      Decimal @default(0) @db.Decimal(14, 2)
+  importeBruto   Decimal @db.Decimal(14, 2)
+  importeNeto    Decimal @db.Decimal(14, 2)
+  orden          Int     @default(0)
+
+  factura Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+
+  @@index([facturaId])
+  @@map("linea_factura")
+}

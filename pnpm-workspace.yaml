@@ -1,0 +1,6 @@
+packages:
+  - "db"
+  - "backend"
+  - "web"
+  - "mobile-pwa"
+  - "packages/*"
