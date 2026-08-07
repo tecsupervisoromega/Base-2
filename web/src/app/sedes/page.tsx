@@ -33,10 +33,19 @@ export default function SedesPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <header className="bg-white border-b px-6 py-3">
-        <Link href="/dashboard" className="text-xs text-slate-500 hover:underline">
-          ← Backoffice
-        </Link>
-        <h1 className="font-semibold">Sedes</h1>
+        <div className="flex items-center justify-between">
+          <div>
+            <Link href="/dashboard" className="text-xs text-slate-500 hover:underline">
+              ← Backoffice
+            </Link>
+            <h1 className="font-semibold">Sedes / Planos</h1>
+          </div>
+          <nav className="flex items-center gap-4 text-sm">
+            <a href="/dashboard" className="text-slate-700 hover:text-brand">Clientes</a>
+            <a href="/sedes" className="text-brand font-medium">Sedes / Planos</a>
+            <a href="/ordenes-trabajo" className="text-slate-700 hover:text-brand">Órdenes de trabajo</a>
+          </nav>
+        </div>
       </header>
       <div className="p-6 max-w-6xl mx-auto">
         {err && <div className="text-red-600 text-sm mb-3">{err}</div>}

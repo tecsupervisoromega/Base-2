@@ -12,6 +12,7 @@ import { RevisionesModule } from './modules/revisiones/revisiones.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { PartesModule } from './modules/partes/partes.module';
 import { PlanosModule } from './modules/planos/planos.module';
+import { EmpleadosModule } from './modules/empleados/empleados.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { PlanosModule } from './modules/planos/planos.module';
     OrdenesTrabajoModule,
     RevisionesModule,
     PartesModule,
+    EmpleadosModule,
   ],
   controllers: [HealthController],
 })

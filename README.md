@@ -118,6 +118,7 @@ El `empresa_id` se extrae del JWT en cada request y se inyecta en los queries vi
 | PATCH | `/api/v1/ordenes-trabajo/:id/asignar` | Asignar tecnicos |
 | PATCH | `/api/v1/ordenes-trabajo/:id/iniciar` | Iniciar OT |
 | PATCH | `/api/v1/ordenes-trabajo/:id/cerrar` | Cerrar OT con firma |
+| GET | `/api/v1/ordenes-trabajo/:id/parte.pdf` | Descargar parte de trabajo en PDF |
 | POST | `/api/v1/revisiones/iniciar` | Crea o recupera la revision de un PC |
 | GET | `/api/v1/revisiones/:id` | Detalle (respuestas + productos + fotos) |
 | PATCH | `/api/v1/revisiones/:id/finalizar` | Cierre de revision con checklist + productos |
@@ -126,13 +127,18 @@ El `empresa_id` se extrae del JWT en cada request y se inyecta en los queries vi
 | GET | `/api/v1/productos/catalogo` | Catalogo de biocidas activos |
 | POST | `/api/v1/storage/presign` | URL prefirmada para subir un archivo a MinIO |
 | POST | `/api/v1/storage/firma` | Sube una firma (dataURL base64) y devuelve la URL |
+| GET | `/api/v1/empleados` | Lista empleados activos de la empresa |
+| GET | `/api/v1/empleados?tecnicos=true` | Solo tecnicos activos |
 
-## Proximos pasos (Fase 3 — pendientes)
+## Proximos pasos
 
 - [x] Flujo completo de revision en PWA (checklist dinamico, productos, foto, firma) — **Fase 3A**
-- [ ] Generacion de PDF del parte de trabajo y certificado — Fase 3B
-- [ ] Gestion completa de plano + puntos de control (drag & drop) — Fase 3C
-- [ ] Sincronizacion offline (IndexedDB + queue de mutations) — Fase 3D
+- [x] Generacion de PDF del parte de trabajo — **Fase 3B**
+- [x] Gestion completa de plano + puntos de control (drag & drop) — **Fase 3C**
+- [x] Sincronizacion offline (IndexedDB + queue de mutations) — **Fase 3D**
+- [x] CRUD clientes en backoffice web (modal crear/editar/borrar + busqueda)
+- [x] Pagina ordenes de trabajo en backoffice (filtros, detalle, link PDF, crear OT)
+- [x] Modulo empleados API (GET /api/v1/empleados)
 - [ ] RLS PostgreSQL + guard que inyecta `empresa_id` automaticamente
 - [ ] Modulo de presupuestos y contratos
 - [ ] Integracion AFIP (factura electronica)
@@ -144,7 +150,7 @@ El `empresa_id` se extrae del JWT en cada request y se inyecta en los queries vi
 - **Libro de tratamientos** obligatorio con trazabilidad de cada aplicacion
 - **CUIT** en lugar de NIF/CIF
 - Zonas horarias `America/Argentina/*`
-- Factura electronica AFIP (CAE, tipos A/B/C/E/M) — modelo preparado, integracion en Fase 3
+- Factura electronica AFIP (CAE, tipos A/B/C/E/M) — modelo preparado, integracion pendiente
 
 ## Licencia
 
